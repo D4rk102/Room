@@ -14,4 +14,7 @@ class UserRepository(private val userDao: UserDao){
     suspend fun deleteById(userId: Int): Int {
         return userDao.deleteById(userId) //llama al metodo deleteById del DAO
     }
+    suspend fun actualizar(user: User) {
+        userDao.updateUser(user.id, user.nombre, user.apellido, user.edad)
+    }
 }

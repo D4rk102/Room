@@ -1,16 +1,13 @@
 package com.example.bd_room.Screen
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +30,7 @@ fun UserApp(userRepository: UserRepository) {
     var nombre by remember { mutableStateOf("") }
     var apellido by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
+    var selectedUserId by remember { mutableStateOf(-1) } // Guardar el ID del usuario seleccionado para modificar
     var scope = rememberCoroutineScope()
 
     var context = LocalContext.current
@@ -61,6 +59,7 @@ fun UserApp(userRepository: UserRepository) {
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
         )
         Spacer(modifier = Modifier.height(8.dp))
+
         Button(
             onClick = {
                 val user = User(
@@ -70,12 +69,20 @@ fun UserApp(userRepository: UserRepository) {
                 )
                 scope.launch {
                     withContext(Dispatchers.IO) {
-                        userRepository.insertar(user)
+                        if (selectedUserId == -1) {
+                            userRepository.insertar(user) // Si no hay usuario seleccionado, insertar nuevo
+                        } else {
+                            userRepository.actualizar(user.copy(id = selectedUserId)) // Modificar si hay usuario seleccionado
+                        }
                     }
-                    Toast.makeText(context,"Usuario Registrado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, if (selectedUserId == -1) "Usuario Registrado" else "Usuario Modificado", Toast.LENGTH_SHORT).show()
+                    selectedUserId = -1 // Resetear el ID después de la modificación
+                    nombre = ""
+                    apellido = ""
+                    edad = ""
                 }
             }) {
-            Text(text = "Registrar")
+            Text(text = if (selectedUserId == -1) "Registrar" else "Modificar")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -98,18 +105,38 @@ fun UserApp(userRepository: UserRepository) {
 
         Column {
             users.forEach { user ->
-                Column {
-                    Text("${user.nombre} ${user.apellido} ${user.edad}")
-                    Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Información del usuario
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("${user.nombre} ${user.apellido} ${user.edad}")
+                    }
 
-                    // Botón para eliminar el usuario
-                    Button(
+                    // Icono de lápiz para modificar
+                    IconButton(
+                        onClick = {
+                            selectedUserId = user.id
+                            nombre = user.nombre
+                            apellido = user.apellido
+                            edad = user.edad.toString()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Modificar",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // Icono de bote de basura para eliminar
+                    IconButton(
                         onClick = {
                             scope.launch {
                                 withContext(Dispatchers.IO) {
-                                    userRepository.deleteById(user.id) // Elimina el usuario por id
+                                    userRepository.deleteById(user.id) // Eliminar usuario por id
                                 }
-                                // Actualizar lista después de eliminar
                                 users = withContext(Dispatchers.IO) {
                                     userRepository.getAllUsers()
                                 }
@@ -117,7 +144,11 @@ fun UserApp(userRepository: UserRepository) {
                             }
                         }
                     ) {
-                        Text("Eliminar")
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Eliminar",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
