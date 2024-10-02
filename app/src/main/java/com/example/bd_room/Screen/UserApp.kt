@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.bd_room.DAO.UserDao
 import com.example.bd_room.Model.User
 import com.example.bd_room.Repository.UserRepository
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun UserApp(userRepository: UserRepository){
+fun UserApp(userRepository: UserRepository) {
     var nombre by remember { mutableStateOf("") }
     var apellido by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
@@ -46,13 +45,13 @@ fun UserApp(userRepository: UserRepository){
         TextField(
             value = nombre,
             onValueChange = { nombre = it },
-            label = { Text(text = "nombre") },
+            label = { Text(text = "Nombre") },
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
             value = apellido,
             onValueChange = { apellido = it },
-            label = { Text("apellido") }
+            label = { Text("Apellido") }
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
@@ -92,15 +91,36 @@ fun UserApp(userRepository: UserRepository){
                 }
             }
         ){
-            Text("listar")
+            Text("Listar")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Column {
-            users.forEach{ user->
-                Text("${user.nombre} ${user.apellido} ${user.edad}")
-                Spacer(modifier = Modifier.height(4.dp))
+            users.forEach { user ->
+                Column {
+                    Text("${user.nombre} ${user.apellido} ${user.edad}")
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Botón para eliminar el usuario
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    userRepository.deleteById(user.id) // Elimina el usuario por id
+                                }
+                                // Actualizar lista después de eliminar
+                                users = withContext(Dispatchers.IO) {
+                                    userRepository.getAllUsers()
+                                }
+                                Toast.makeText(context, "Usuario Eliminado", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ) {
+                        Text("Eliminar")
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
