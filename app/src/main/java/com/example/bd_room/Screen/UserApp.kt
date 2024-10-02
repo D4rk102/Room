@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
@@ -89,7 +90,7 @@ fun UserApp(userRepository: UserRepository) {
 
         var users by remember { mutableStateOf(listOf<User>()) }
 
-        Button(
+        IconButton(
             onClick = {
                 scope.launch{
                     users = withContext(Dispatchers.IO){
@@ -98,7 +99,11 @@ fun UserApp(userRepository: UserRepository) {
                 }
             }
         ){
-            Text("Listar")
+            Icon(
+                imageVector = Icons.Filled.ArrowDropDown,
+                contentDescription = "Listar",
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
