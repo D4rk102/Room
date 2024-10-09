@@ -1,20 +1,14 @@
-package com.example.bd_room.Screen
-
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,13 +22,24 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun UserApp(userRepository: UserRepository) {
-    var nombre by remember { mutableStateOf("") }
-    var apellido by remember { mutableStateOf("") }
-    var edad by remember { mutableStateOf("") }
-    var selectedUserId by remember { mutableStateOf(-1) } // Guardar el ID del usuario seleccionado para modificar
-    var scope = rememberCoroutineScope()
+    var nombre by rememberSaveable { mutableStateOf("") }
+    var apellido by rememberSaveable { mutableStateOf("") }
+    var edad by rememberSaveable { mutableStateOf("") }
+    var selectedUserId by rememberSaveable { mutableStateOf(-1) }
+    var users by rememberSaveable { mutableStateOf(listOf<User>()) }
 
+    var scope = rememberCoroutineScope()
     var context = LocalContext.current
+
+    // Estado para manejo de cuadros de confirmación
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showModifyDialog by remember { mutableStateOf(false) }
+    var userToDelete by remember { mutableStateOf<User?>(null) }
+    var userToModify by remember { mutableStateOf<User?>(null) }
+
+    // Estado para manejar el error en el registro
+    var showError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -43,110 +48,127 @@ fun UserApp(userRepository: UserRepository) {
     ) {
         TextField(
             value = nombre,
-            onValueChange = { nombre = it },
+            onValueChange = {
+                nombre = it
+                showError = false
+            },
             label = { Text(text = "Nombre") },
+            isError = showError && nombre.isEmpty()
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
             value = apellido,
-            onValueChange = { apellido = it },
-            label = { Text("Apellido") }
+            onValueChange = {
+                apellido = it
+                showError = false
+            },
+            label = { Text("Apellido") },
+            isError = showError && apellido.isEmpty()
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
             value = edad,
-            onValueChange = { edad = it },
+            onValueChange = {
+                edad = it
+                showError = false
+            },
             label = { Text("Edad") },
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+            isError = showError && (edad.isEmpty() || edad.toIntOrNull() == null || edad.toIntOrNull() !in 1..100)
         )
         Spacer(modifier = Modifier.height(8.dp))
 
+        if (showError) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         Button(
             onClick = {
+                val edadInt = edad.toIntOrNull()
+                if (nombre.isEmpty() || apellido.isEmpty() || edad.isEmpty() || edadInt == null || edadInt !in 1..100) {
+                    showError = true
+                    errorMessage = when {
+                        nombre.isEmpty() -> "El campo Nombre es obligatorio."
+                        apellido.isEmpty() -> "El campo Apellido es obligatorio."
+                        edad.isEmpty() -> "El campo Edad es obligatorio."
+                        edadInt == null -> "La edad debe ser un número válido."
+                        edadInt !in 1..100 -> "La edad debe estar entre 1 y 100 años."
+                        else -> ""
+                    }
+                    return@Button
+                }
+
                 val user = User(
                     nombre = nombre,
                     apellido = apellido,
-                    edad = edad.toIntOrNull() ?: 0
+                    edad = edadInt
                 )
                 scope.launch {
                     withContext(Dispatchers.IO) {
                         if (selectedUserId == -1) {
-                            userRepository.insertar(user) // Si no hay usuario seleccionado, insertar nuevo
+                            userRepository.insertar(user)
                         } else {
-                            userRepository.actualizar(user.copy(id = selectedUserId)) // Modificar si hay usuario seleccionado
+                            userRepository.actualizar(user.copy(id = selectedUserId))
                         }
                     }
                     Toast.makeText(context, if (selectedUserId == -1) "Usuario Registrado" else "Usuario Modificado", Toast.LENGTH_SHORT).show()
-                    selectedUserId = -1 // Resetear el ID después de la modificación
+                    selectedUserId = -1
                     nombre = ""
                     apellido = ""
                     edad = ""
                 }
-            }) {
+            }
+        ) {
             Text(text = if (selectedUserId == -1) "Registrar" else "Modificar")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        var users by remember { mutableStateOf(listOf<User>()) }
-
-        IconButton(
+        Button(
             onClick = {
-                scope.launch{
-                    users = withContext(Dispatchers.IO){
+                scope.launch {
+                    users = withContext(Dispatchers.IO) {
                         userRepository.getAllUsers()
                     }
                 }
             }
-        ){
-            Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = "Listar",
-                tint = MaterialTheme.colorScheme.primary
-            )
+        ) {
+            Text("Listar")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Column {
-            users.forEach { user ->
+        LazyColumn {
+            items(users) { user ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Información del usuario
                     Column(modifier = Modifier.weight(1f)) {
                         Text("${user.nombre} ${user.apellido} ${user.edad}")
                     }
 
-                    // Icono de lápiz para modificar
                     IconButton(
                         onClick = {
-                            selectedUserId = user.id
-                            nombre = user.nombre
-                            apellido = user.apellido
-                            edad = user.edad.toString()
+                            userToModify = user
+                            showModifyDialog = true
                         }
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Settings,
+                            imageVector = Icons.Filled.Edit,
                             contentDescription = "Modificar",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
 
-                    // Icono de bote de basura para eliminar
                     IconButton(
                         onClick = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    userRepository.deleteById(user.id) // Eliminar usuario por id
-                                }
-                                users = withContext(Dispatchers.IO) {
-                                    userRepository.getAllUsers()
-                                }
-                                Toast.makeText(context, "Usuario Eliminado", Toast.LENGTH_SHORT).show()
-                            }
+                            userToDelete = user
+                            showDeleteDialog = true
                         }
                     ) {
                         Icon(
@@ -159,5 +181,69 @@ fun UserApp(userRepository: UserRepository) {
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
+
+        // Cuadro de confirmación para eliminar
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            userToDelete?.let {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        userRepository.deleteById(it.id)
+                                    }
+                                    users = withContext(Dispatchers.IO) {
+                                        userRepository.getAllUsers()
+                                    }
+                                }
+                                Toast.makeText(context, "Usuario Eliminado", Toast.LENGTH_SHORT).show()
+                            }
+                            showDeleteDialog = false
+                        }
+                    ) {
+                        Text("Eliminar")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { showDeleteDialog = false }) {
+                        Text("Cancelar")
+                    }
+                },
+                title = { Text("Confirmar eliminación") },
+                text = { Text("¿Estás seguro de que deseas eliminar este usuario?") }
+            )
+        }
+
+        // Cuadro de confirmación para modificar
+        if (showModifyDialog) {
+            AlertDialog(
+                onDismissRequest = { showModifyDialog = false },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            userToModify?.let {
+                                selectedUserId = it.id
+                                nombre = it.nombre
+                                apellido = it.apellido
+                                edad = it.edad.toString()
+                            }
+                            showModifyDialog = false
+                        }
+                    ) {
+                        Text("Modificar")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { showModifyDialog = false }) {
+                        Text("Cancelar")
+                    }
+                },
+                title = { Text("Confirmar modificación") },
+                text = { Text("¿Estás seguro de que deseas modificar este usuario?") }
+            )
+        }
     }
 }
+

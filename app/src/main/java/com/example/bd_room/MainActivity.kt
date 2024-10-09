@@ -1,5 +1,6 @@
 package com.example.bd_room
 
+import UserApp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,7 +15,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.bd_room.DAO.UserDao
 import com.example.bd_room.Database.UserDatabase
 import com.example.bd_room.Repository.UserRepository
-import com.example.bd_room.Screen.UserApp
 import com.example.bd_room.ui.theme.BD_RoomTheme
 
 class MainActivity : ComponentActivity() {
